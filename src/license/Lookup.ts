@@ -2,7 +2,7 @@ import { Context } from "probot";
 
 import { LicenseLookup } from "license-lookup"
 import { StatusEnum } from "../interfaces/StatusEnum";
-import { LicenseConfig } from "../config/license";
+import { LicenseTypes } from "../config/licensetypes";
 import { ILicenseConfig } from "../interfaces/ILicenseConfig";
 import { IResult } from "../interfaces/iresult";
 import { IResultSummary } from "../interfaces/iresultsummary";
@@ -12,6 +12,7 @@ export default class Lookup {
   
   result = new Array<IResult>();
   private _summary : IResultSummary | null = null;
+  private _config = {};
 
   constructor() {
   
@@ -26,7 +27,22 @@ export default class Lookup {
     return comment;
   }
   
-  private _licenseBanned(license : string | undefined, config : any ){
+  private _buildConfig(config : ILicenseConfig){
+     function parse(licenses : Array<string>){
+        for (const group of Object.keys(LicenseTypes)) {
+          var groupIndex = licenses.indexOf(group);
+          if(groupIndex >= 0){
+            licenses.splice(groupIndex, 1);
+            licenses = licenses.concat(LicenseTypes[group.toString()])
+          }
+        }
+     } 
+
+     parse(config.exclude);
+     parse(config.onlyAllow);
+  }
+
+  private _licenseBanned(license : string | undefined, config : ILicenseConfig ){
     if(!license){
       return StatusEnum.Warning; 
     }
