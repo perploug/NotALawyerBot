@@ -8,6 +8,8 @@ When a new pull request is submitted it will scan the changed files to determine
 
 The bot will warn the reviewer to be aware of new dependencies with a comment on the PR, if the dependency license is block due to exclude/allow settings it will also block the PR from being merged - for this to work
 
+![Comment](comment.png)
+
 ## How to use
 Install the bot from its public github page: https://github.com/apps/not-a-lawyer-bot - by default the bot will warn about all new dependencies and blocks new dependencies which are not part of the [default list of allowed licences](#Licenses-allowed-by-default)
 
