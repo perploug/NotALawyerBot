@@ -2,11 +2,9 @@ import { Context } from "probot";
 import { LicenseConfig } from "./config/license"
 import { AppConfig } from "./config/app"
 
-import { ChecksCreateParams } from "@octokit/rest";
+import { ChecksCreateParams, PullRequestsGetResponse } from "@octokit/rest";
 import { StatusEnum } from "./interfaces/StatusEnum";
 import Lookup from "./license/Lookup";
-
-
 
 async function handlePullRequestChange(context: Context) {
   
@@ -14,7 +12,7 @@ async function handlePullRequestChange(context: Context) {
   const cfg = await context.config(AppConfig.configfile, LicenseConfig);
   const CHECKNAME = AppConfig.checkname;
 
-  const pullRequest = context.payload.pull_request;
+  const pullRequest : PullRequestsGetResponse = context.payload.pull_request;
   const issue = context.issue();
   const repo = context.repo();
   const { sha } = context.payload.pull_request.head;
@@ -40,8 +38,8 @@ async function handlePullRequestChange(context: Context) {
   });
   
   //do the license lookup
-  var lookup = new Lookup(cfg);
-  var results = await lookup.run(context);
+  var lookup = new Lookup(cfg, context);
+  var results = await lookup.run(context.repo(), pullRequest.base.ref, pullRequest);
   
   // looking up warnings and failures
   var problems = results.filter(x => x.result === StatusEnum.Failure);
@@ -61,8 +59,8 @@ async function handlePullRequestChange(context: Context) {
   
   if(problems.length + warnings.length > 0){
     
-    var body = lookup.render();
-    checkResult.output!.summary = AppConfig.description;
+    var body = lookup.render(true);
+    checkResult.output!.summary = AppConfig.review;
     checkResult.output!.text = body;
 
     //section for providing guidance as a comment on the P
@@ -70,9 +68,9 @@ async function handlePullRequestChange(context: Context) {
     const comment = issue_comments.data.find(comment => comment.user.login === AppConfig.checkname + "[bot]");
 
     if(comment){
-        await context.github.issues.updateComment({ ...repo, comment_id: comment.id, body: body });
+        await context.github.issues.updateComment({ ...repo, comment_id: comment.id, body: AppConfig.review + "\n" +body });
       }else{
-        await context.github.issues.createComment({ ...issue, body: body });
+        await context.github.issues.createComment({ ...issue, body: AppConfig.review + "\n" + body });
     }
   }
 

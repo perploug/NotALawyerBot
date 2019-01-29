@@ -2,23 +2,36 @@ import { Context } from "probot";
 
 import { LicenseLookup } from "license-lookup"
 import { StatusEnum } from "../interfaces/StatusEnum";
-import { LicenseTypes } from "../config/licensetypes";
+import { LicenseTypes, FindCompatible } from "../config/licensetypes";
 import { ILicenseConfig } from "../interfaces/ILicenseConfig";
 import { IResult } from "../interfaces/iresult";
 import { IResultSummary } from "../interfaces/iresultsummary";
 import { AppConfig } from "../config/app"
 import { ILicenseTypes } from "../interfaces/ilicensetypes";
+import { PullRequestsGetResponse } from "@octokit/rest";
+import { IDependency } from "license-lookup/lib/interfaces/IDependency";
+
 
 export default class Lookup {
   
   result = new Array<IResult>();
   private _summary : IResultSummary | null = null;
-  private _config :ILicenseConfig = {exclude: [], onlyAllow: []};
+  private _config : ILicenseConfig;
+  private _onlyNew : boolean = true;
+  private _context : Context;
 
-  constructor(config: ILicenseConfig) {
+  constructor(config: ILicenseConfig, context: Context, baseLicense : string | undefined = undefined,  onlyNew : boolean = true) {
+    this._onlyNew = onlyNew;
     this._config = config;
-    this._config.exclude = this._buildConfig(config.exclude, LicenseTypes);
-    this._config.onlyAllow = this._buildConfig(config.onlyAllow, LicenseTypes);
+    this._context = context;
+
+    if(baseLicense){
+      this._config.exclude = [];
+      this._config.onlyAllow = FindCompatible(baseLicense);
+    }else{
+      this._config.exclude =  this._buildConfig(config.exclude, LicenseTypes);
+      this._config.onlyAllow = this._buildConfig(config.onlyAllow, LicenseTypes);
+    }
   }
 
   private async checkComments(context : Context, pull : any) {
@@ -30,8 +43,9 @@ export default class Lookup {
     return comment;
   }
   
-  private _buildConfig(licenses: Array<string>, licenseTypes: ILicenseTypes){
+  private _buildConfig(licenses: Array<string> | undefined, licenseTypes: ILicenseTypes){
     
+    if(licenses){
         for (const group of Object.keys(licenseTypes)) {
           var groupIndex = licenses.indexOf(group);
           if(groupIndex >= 0){
@@ -39,7 +53,9 @@ export default class Lookup {
             licenses.push(...licenseTypes[group.toString()])
           }
         }
-        return licenses;
+    }
+    
+    return licenses; 
   }
 
   private _licenseBanned(license : string | undefined){
@@ -62,42 +78,63 @@ export default class Lookup {
     return StatusEnum.Warning;
   }
 
-  async run(context: Context) : Promise<Array<IResult>>{
+  async run(repo: {repo: string, owner: string}, ref : string = 'master', pr: PullRequestsGetResponse | undefined = undefined) : Promise<Array<IResult>>{
 
-    // repo and pr data
-    //const repo = context.repo();
-    const pr = context.payload.pull_request;
-    const repo = context.repo();
-    const pr_contents = await context.github.pullRequests.listFiles({ ...repo, number: pr.number});
-    const pr_files = pr_contents.data.map(x => x.filename);
+    let files : Array<string> = [];
+
+    // only if a PR is provided and comparable mode is enabled
+    // otherwise scan all files to get a complete view of found dependencies
+    if(pr){
+      const pr_contents = await this._context.github.pullRequests.listFiles({ ...repo, number: pr.number});
+      files = pr_contents.data.map(x => x.filename); 
+    }else{
+      const repo_contens : Array<any> = (await this._context.github.repos.getContents({...repo, path: "/"})).data;
+      files = repo_contens.filter(x  => x.type === "file").map(x => x.path)
+    }
 
     var ll = new LicenseLookup();
-    var matches = ll.matchFilesToManager(pr_files);
+    var matches = ll.matchFilesToManager(files);
     if(matches.length == 0)
     {
       return [];
     }
-    
 
     for(const match of matches){
 
       try{
-      var base = await context.github.repos.getContents( {...repo, path: match.file,});
-      var head = await context.github.repos.getContents( {repo: pr.head.repo.name, owner: pr.head.repo.owner.login, path: match.file, ref: pr.head.ref})
-      
-      const base_content = Buffer.from(base.data.content, 'base64').toString()
-      const head_content = Buffer.from(head.data.content, 'base64').toString()
 
-      var base_deps = await match.manager.detect(base_content);
-      var head_deps = await match.manager.detect(head_content);
+      var deps : Array<IDependency> = [];
 
-      var baseDepsKeys = base_deps.map(x => x.name);
-      var new_deps = head_deps.filter( x => baseDepsKeys.indexOf(x.name)<0 );
-      var new_deps_lookup = await match.manager.lookup(new_deps);
+      // if we only want new dependencies, we must exclude the ones currently in the base
+      if(pr){
+
+        // get proposed dependencies
+        var head_response = await this._context.github.repos.getContents( {...repo, ref: pr.head.ref, path: match.file})
+        const head_content = Buffer.from(head_response.data.content, 'base64').toString()
+        deps = await match.manager.detect(head_content);
+
+        if(this._onlyNew == false){
+          // get current dependencies
+          const base = {repo: pr.base.repo.name, owner: pr.base.repo.owner.login};
+          var base_response = await this._context.github.repos.getContents( {...base, path: match.file,});
+          const base_content = Buffer.from(base_response.data.content, 'base64').toString()
+          var base_deps = await match.manager.detect(base_content);
+          
+          //filter out existing
+          var baseDepsKeys = base_deps.map(x => x.name);
+          deps = deps.filter( x => baseDepsKeys.indexOf(x.name)<0 );
+        }
+      }else{
+        var repo_response = await this._context.github.repos.getContents( {...repo, ref: ref, path: match.file})
+        const repo_content = Buffer.from(repo_response.data.content, 'base64').toString()
+        deps = await match.manager.detect(repo_content);
+      }
       
-      for(var dd of new_deps_lookup){
+      var deps_lookup = await match.manager.lookup(deps);
+      
+      for(var dd of deps_lookup){
         this.result.push({
-          label: `Detected **[${dd.name}](${dd.url})** as a new dependency in **${match.file}**, licensed under: **${dd.license}**`,
+          label: `Detected **[${dd.name}](${dd.url})** as a dependency in **${match.file}**, ${dd.license ?  `licensed under: **[${dd.license}](https://spdx.org/licenses/${dd.license}.html)**` : 'With an unknown license' }`,
           result: this._licenseBanned(dd.license),
           dependency: dd
         });
@@ -128,7 +165,7 @@ export default class Lookup {
     return this._summary
   }
 
-  render(){
+  render(incudeDescription : boolean = true){
     const icon = (status: StatusEnum)=>{
       switch (status) {
         case StatusEnum.Success:
@@ -144,18 +181,17 @@ export default class Lookup {
 
    
     var resolutions = [];
-    resolutions.push(`### ${AppConfig.description}`);
-
+   
     if(this.result){
-      resolutions.push(" ");
+      
       for(const subResult of this.result){
           resolutions.push(`#### ${icon(subResult.result)} ${subResult.label}`);
           
-          if(subResult.dependency){
+          if(subResult.dependency && incudeDescription){
             if(subResult.result === StatusEnum.Failure){
               resolutions.push("This dependency is distributed under a license which is not allowed on this project - **this pull request can therefore not be merged**");
             }else{
-              resolutions.push(`This is a new dependency, please [review it](${subResult.dependency.url}) and confirm you wish to introduce this to the codebase`);
+              resolutions.push(`lease [review it](${subResult.dependency.url}) and confirm you wish to introduce this to the codebase`);
             }
           }
       }

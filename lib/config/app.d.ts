@@ -2,6 +2,7 @@ declare let AppConfig: {
     appname: string;
     checkname: string;
     configfile: string;
-    description: string;
+    review: string;
+    overview: string;
 };
 export { AppConfig };

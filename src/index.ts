@@ -1,12 +1,19 @@
 import { Application } from "probot";
-
+import { repositoryAdded } from "./repository-added"
 
 export = (app: Application) => {
   // Your code here
   app.log("Yay, the app was loaded!");
 
   const handlePullRequest = require("./pull-request-change");
-  const setStatusPass = require("./set-status-pass");
+  //const repositoryAdded = require("./repository-added");
+
+
+  app.on("",
+    async function(context){
+      app.log(context)
+    }
+  );
 
   app.on(
     [
@@ -15,5 +22,5 @@ export = (app: Application) => {
     handlePullRequest
   );
 
-  app.on('check_run.requested_action', setStatusPass)  
+  app.on('installation_repositories.added', repositoryAdded)  
 };

@@ -2,6 +2,40 @@ import { ILicenseTypes } from "../interfaces/ilicensetypes";
 
 // this list is compiled from the excellent Libraries.io project: https://github.com/librariesio/license-compatibility
 // unfortunately is ruby-based so could not adopt it as a dependency. 
+function FindCompatible(baselicense : string) : Array<string> {
+	
+	var group =  Object.entries(LicenseTypes)
+									.filter(x => x[1].indexOf(baselicense) >= 0)[0];
+
+	var allowed : Array<string> = [];
+	allowed = allowed.concat(LicenseTypes.publicdomain)
+									 .concat(LicenseTypes.permissive)
+	// find compatible groups
+
+	if(group[0] === "publicdomain"){
+		return allowed;
+	}
+
+	if(group[0] === "permissive" || group[0] === "weakcopyleft" ){
+		return allowed
+						.concat(LicenseTypes.weakcopyleft);
+	}
+
+	if(group[0] === "strongcopyleft"){
+		return allowed
+						.concat(LicenseTypes.strongcopyleft)
+						.concat(LicenseTypes.weakcopyleft);
+	}
+
+	if(group[0] === "networkcopyleft"){
+		return allowed
+						.concat(LicenseTypes.strongcopyleft)
+						.concat(LicenseTypes.weakcopyleft)
+						.concat(LicenseTypes.networkcopyleft)
+	}
+
+	return allowed;
+}
 
 let LicenseTypes : ILicenseTypes = {
 	publicdomain: [
@@ -81,4 +115,4 @@ let LicenseTypes : ILicenseTypes = {
 	]
 };
 
-export { LicenseTypes };
+export { LicenseTypes, FindCompatible };

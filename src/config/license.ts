@@ -1,6 +1,11 @@
 import { ILicenseConfig } from "../interfaces/ILicenseConfig";
+import { StatusEnum } from "../interfaces/StatusEnum";
 
 let LicenseConfig : ILicenseConfig = {
+
+    onNolicense: StatusEnum.Warning,
+    onNotFound: StatusEnum.Success,
+    
     // By default this only allows licenses which are compatible with MIT and similiar
     // modify to suit your needs.
     onlyAllow: [
@@ -16,7 +21,7 @@ let LicenseConfig : ILicenseConfig = {
     ],
 
     // use a ban approach 
-    exclude: [] 
+    exclude: undefined
 };
 
 export { LicenseConfig };
