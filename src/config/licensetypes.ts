@@ -1,5 +1,8 @@
 import { ILicenseTypes } from "../interfaces/ilicensetypes";
 
+// this list is compiled from the excellent Libraries.io project: https://github.com/librariesio/license-compatibility
+// unfortunately is ruby-based so could not adopt it as a dependency. 
+
 let LicenseTypes : ILicenseTypes = {
 	publicdomain: [
 		"CC0-1.0",
