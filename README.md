@@ -62,10 +62,10 @@ npm start
 
 ## Contributing
 
-If you have suggestions for how notalawyerbot could be improved, or want to report a bug, open an issue! We'd love all and any contributions.
+If you have suggestions for how notalawyerbot could be improved, or want to report a bug, open an issue! We'd love all and any contributions. The logic for detecting and looking up licenses are powered by https://github.com/perploug/license-lookup - if you wish to add support of another format or fix/submit issues - please do son on the license-lookup project tracker. 
 
 For more, check out the [Contributing Guide](CONTRIBUTING.md).
 
 ## License
 
-[ISC](LICENSE) © 2019 Per Ploug <per.ploug@zalando.de> (https://plo.ug)
+[MIT](LICENSE) © 2019 Per Ploug <per.ploug@zalando.de> (https://plo.ug)
