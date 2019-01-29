@@ -7,15 +7,18 @@ import { ILicenseConfig } from "../interfaces/ILicenseConfig";
 import { IResult } from "../interfaces/iresult";
 import { IResultSummary } from "../interfaces/iresultsummary";
 import { AppConfig } from "../config/app"
+import { ILicenseTypes } from "../interfaces/ilicensetypes";
 
 export default class Lookup {
   
   result = new Array<IResult>();
   private _summary : IResultSummary | null = null;
-  private _config = {};
+  private _config :ILicenseConfig = {exclude: [], onlyAllow: []};
 
-  constructor() {
-  
+  constructor(config: ILicenseConfig) {
+    this._config = config;
+    this._config.exclude = this._buildConfig(config.exclude, LicenseTypes);
+    this._config.onlyAllow = this._buildConfig(config.onlyAllow, LicenseTypes);
   }
 
   private async checkComments(context : Context, pull : any) {
@@ -27,42 +30,39 @@ export default class Lookup {
     return comment;
   }
   
-  private _buildConfig(config : ILicenseConfig){
-     function parse(licenses : Array<string>){
-        for (const group of Object.keys(LicenseTypes)) {
+  private _buildConfig(licenses: Array<string>, licenseTypes: ILicenseTypes){
+    
+        for (const group of Object.keys(licenseTypes)) {
           var groupIndex = licenses.indexOf(group);
           if(groupIndex >= 0){
             licenses.splice(groupIndex, 1);
-            licenses = licenses.concat(LicenseTypes[group.toString()])
+            licenses.push(...licenseTypes[group.toString()])
           }
         }
-     } 
-
-     parse(config.exclude);
-     parse(config.onlyAllow);
+        return licenses;
   }
 
-  private _licenseBanned(license : string | undefined, config : ILicenseConfig ){
+  private _licenseBanned(license : string | undefined){
     if(!license){
       return StatusEnum.Warning; 
     }
 
-    if(!config){
+    if(!this._config){
       return StatusEnum.Warning; 
     }
 
-    if(config.exclude && config.exclude.length>0 && config.exclude.indexOf(license)){
+    if(this._config.exclude && this._config.exclude.length>0 && this._config.exclude.indexOf(license)>=0){
       return StatusEnum.Failure;
     }
 
-    if(config.onlyAllow && config.onlyAllow.length>0 && config.onlyAllow.indexOf(license)<0){
+    if(this._config.onlyAllow && this._config.onlyAllow.length>0 && this._config.onlyAllow.indexOf(license)<0){
       return StatusEnum.Failure;
     }
 
     return StatusEnum.Warning;
   }
 
-  async run(context: Context, config: ILicenseConfig) : Promise<Array<IResult>>{
+  async run(context: Context) : Promise<Array<IResult>>{
 
     // repo and pr data
     //const repo = context.repo();
@@ -98,7 +98,7 @@ export default class Lookup {
       for(var dd of new_deps_lookup){
         this.result.push({
           label: `Detected **[${dd.name}](${dd.url})** as a new dependency in **${match.file}**, licensed under: **${dd.license}**`,
-          result: this._licenseBanned(dd.license, config),
+          result: this._licenseBanned(dd.license),
           dependency: dd
         });
       }

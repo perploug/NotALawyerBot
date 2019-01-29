@@ -40,8 +40,8 @@ async function handlePullRequestChange(context: Context) {
   });
   
   //do the license lookup
-  var lookup = new Lookup();
-  var results = await lookup.run(context, cfg);
+  var lookup = new Lookup(cfg);
+  var results = await lookup.run(context);
   
   // looking up warnings and failures
   var problems = results.filter(x => x.result === StatusEnum.Failure);
