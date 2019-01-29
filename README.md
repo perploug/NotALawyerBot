@@ -1,4 +1,4 @@
-# notalawyerbot
+# Not A Lawyer Bot
 
 > A GitHub App built with [Probot](https://github.com/probot/probot) to scan for dependency licenses during code reviews.
 > Notice, this bot is still in a beta state running on a small heroku instance. 
