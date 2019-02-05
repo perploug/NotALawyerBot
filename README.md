@@ -4,7 +4,8 @@
 > Notice, this bot is still in a beta state running on a small heroku instance. 
 
 ## What will it do?
-When a new pull request is submitted it will scan the changed files to determine if there are any changes to support package managers (npm, pip, gradle and sbt currently supported). It will then attempt to lookup the license of all new dependencies. 
+When a new pull request is submitted it will scan the changed files to determine if there are any changes to support package managers 
+**(npm, pip, gradle, pom.xml, gemfile and sbt currently supported)**. It will then attempt to lookup the license of all new dependencies. 
 
 The bot will warn the reviewer to be aware of new dependencies with a comment on the PR, if the dependency license is block due to exclude/allow settings it will also block the PR from being merged - for this to be effective you must enable branch protection and enforce reviews. 
 
